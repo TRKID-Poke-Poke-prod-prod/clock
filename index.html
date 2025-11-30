@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -331,12 +330,14 @@
             <button id="endBtn" onclick="handleEnd()" disabled>■ END SESSION</button>
             <button onclick="openAddModal()">+ ADD FUNDS</button>
             <button onclick="viewLogs()">📋 VIEW LOGS</button>
+            <button onclick="openAdminModal()">⚙️ ADMIN</button>
+            <button onclick="confirmClearAll()" style="background: linear-gradient(135deg, rgba(255, 0, 0, 0.2), rgba(255, 0, 102, 0.2)); border-color: rgba(255, 0, 0, 0.5);">🗑️ CLEAR ALL</button>
         </div>
 
         <div class="terminal" id="terminal">
-            <div class="terminal-line info">╔════════════════════════════════════════╗</div>
-            <div class="terminal-line info">║  HOLOGRAPHIC SESSION TRACKER v3.0     ║</div>
-            <div class="terminal-line info">╚════════════════════════════════════════╝</div>
+            <div class="terminal-line info">╔══════════════════════════════════════════════════╗</div>
+            <div class="terminal-line info">║     HOLOGRAPHIC SESSION TRACKER v3.0            ║</div>
+            <div class="terminal-line info">╚══════════════════════════════════════════════════╝</div>
             <div class="terminal-line">System initialized and ready.</div>
             <div class="terminal-line success">✓ All systems operational.</div>
         </div>
@@ -361,7 +362,7 @@
                 </button>
                 <button class="amount-btn" onclick="addFunds(200)">
                     $200
-                    <span class="bonus-badge">+$100</span>
+                    <span class="bonus-badge">+$200</span>
                 </button>
             </div>
             <input type="number" class="custom-amount" id="customAmount" placeholder="Or enter custom amount..." />
@@ -386,6 +387,25 @@
         </div>
     </div>
 
+    <!-- Admin Modal -->
+    <div class="modal" id="adminModal">
+        <div class="modal-content">
+            <div class="modal-title">⚙️ ADMIN CONTROLS</div>
+            <div style="margin: 20px 0;">
+                <div style="margin-bottom: 15px; color: #888;">Set Balance:</div>
+                <input type="number" class="custom-amount" id="adminBalance" placeholder="Enter new balance..." />
+                <div style="margin: 20px 0 15px 0; color: #888;">Set Rate per Hour:</div>
+                <input type="number" class="custom-amount" id="adminRate" placeholder="Enter new rate..." />
+                <div style="margin: 20px 0 15px 0; color: #888;">Change Admin Password:</div>
+                <input type="password" class="custom-amount" id="newPassword" placeholder="Enter new password (leave blank to keep current)" />
+            </div>
+            <div class="modal-buttons">
+                <button onclick="applyAdminChanges()">✓ APPLY</button>
+                <button class="close-btn" onclick="closeModal('adminModal')">✗ CANCEL</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Use JSON file instead of DLL (browsers can't access DLL files)
         // This will attempt to load from data.json if it exists
@@ -394,6 +414,7 @@
         let startTime = null;
         let logs = [];
         let timerInterval = null;
+        let adminPassword = 'admin'; // Default password
 
         // Try to load from external JSON file
         async function loadFromJSON() {
@@ -415,12 +436,14 @@
             balance = parseFloat(localStorage.getItem('balance')) || 200;
             costPerHour = parseFloat(localStorage.getItem('costPerHour')) || 3;
             logs = JSON.parse(localStorage.getItem('logs')) || [];
+            adminPassword = localStorage.getItem('adminPassword') || 'admin';
         }
 
         function saveData() {
             localStorage.setItem('balance', balance);
             localStorage.setItem('costPerHour', costPerHour);
             localStorage.setItem('logs', JSON.stringify(logs));
+            localStorage.setItem('adminPassword', adminPassword);
         }
 
         function updateDisplay() {
@@ -464,7 +487,7 @@
             timerInterval = setInterval(updateTimer, 1000);
             
             const timeStr = startTime.toLocaleTimeString();
-            addTerminalLine('─────────────────────────────────', 'info');
+            addTerminalLine('══════════════════════════════════════════════════', 'info');
             addTerminalLine(`✓ Session started at ${timeStr}`, 'success');
             addTerminalLine(`  Balance: $${balance.toFixed(2)}`, 'info');
             addTerminalLine('─────────────────────────────────', 'info');
@@ -529,9 +552,9 @@
         }
 
         function addFunds(amount) {
-            const bonuses = { 100: 100, 50: 30, 20: 10 };
+            const bonuses = { 200: 200, 100: 100, 50: 30, 20: 10 };
             let bonus = 0;
-            for (let threshold in bonuses) {
+            for (let threshold of [200, 100, 50, 20]) {
                 if (amount >= threshold) {
                     bonus = bonuses[threshold];
                     break;
@@ -579,19 +602,63 @@
                 return;
             }
 
-            addTerminalLine('╔════════ TRANSACTION LOGS ════════╗', 'info');
+            addTerminalLine('╔═══════════════ TRANSACTION LOGS ═══════════════╗', 'info');
             logs.slice(-10).forEach((log) => {
                 if (log.type === 'deposit') {
-                    addTerminalLine(`[${log.date}] +$${log.amount} (bonus: $${log.bonus}) = $${log.balance}`, 'success');
+                    addTerminalLine(`  [${log.date}] +${log.amount} (bonus: ${log.bonus}) = ${log.balance}`, 'success');
                 } else {
-                    addTerminalLine(`[${log.date}] -$${log.cost} (${log.duration}h) = $${log.balance}`, 'highlight');
+                    addTerminalLine(`  [${log.date}] -${log.cost} (${log.duration}h) = ${log.balance}`, 'highlight');
                 }
             });
-            addTerminalLine('╚══════════════════════════════════╝', 'info');
+            addTerminalLine('╚════════════════════════════════════════════════╝', 'info');
         }
 
         function closeModal(modalId) {
             document.getElementById(modalId).classList.remove('active');
+        }
+
+        function openAdminModal() {
+            document.getElementById('adminBalance').value = balance.toFixed(2);
+            document.getElementById('adminRate').value = costPerHour.toFixed(2);
+            document.getElementById('adminModal').classList.add('active');
+        }
+
+        function applyAdminChanges() {
+            const newBalance = parseFloat(document.getElementById('adminBalance').value);
+            const newRate = parseFloat(document.getElementById('adminRate').value);
+            
+            if (!isNaN(newBalance) && newBalance >= 0) {
+                const oldBalance = balance;
+                balance = newBalance;
+                addTerminalLine('══════════════════════════════════════════════════', 'info');
+                addTerminalLine(`⚙️ Admin: Balance changed from ${oldBalance.toFixed(2)} to ${balance.toFixed(2)}`, 'highlight');
+            }
+            
+            if (!isNaN(newRate) && newRate > 0) {
+                const oldRate = costPerHour;
+                costPerHour = newRate;
+                addTerminalLine(`⚙️ Admin: Rate changed from ${oldRate.toFixed(2)}/hr to ${costPerHour.toFixed(2)}/hr`, 'highlight');
+            }
+            
+            addTerminalLine('══════════════════════════════════════════════════', 'info');
+            
+            saveData();
+            updateDisplay();
+            closeModal('adminModal');
+        }
+
+        function confirmClearAll() {
+            if (confirm('⚠️ WARNING: This will clear all logs and reset balance to $0. Are you sure?')) {
+                balance = 0;
+                logs = [];
+                saveData();
+                updateDisplay();
+                
+                addTerminalLine('══════════════════════════════════════════════════', 'error');
+                addTerminalLine('🗑️ ALL DATA CLEARED - Balance reset to $0', 'error');
+                addTerminalLine('🗑️ ALL LOGS DELETED', 'error');
+                addTerminalLine('══════════════════════════════════════════════════', 'error');
+            }
         }
 
         // Initialize
